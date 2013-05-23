@@ -9,6 +9,7 @@ from django.utils import simplejson
 from django.contrib import messages
 from django.core.urlresolvers import reverse
 from django.core.exceptions import ObjectDoesNotExist
+from nodeshot.json_serializer import JSONSerializer
 from nodeshot.models import *
 from nodeshot.forms import *
 from nodeshot.utils import signal_to_bar, distance, email_owners, jslugify
@@ -136,6 +137,38 @@ def nodes(request):
     }
     # return json
     return HttpResponse(simplejson.dumps(data), mimetype='application/json')
+
+def json_response_from(response):
+    jsonSerializer = JSONSerializer()
+    return HttpResponse(jsonSerializer.serialize(response, use_natural_keys=True), mimetype='application/json')
+
+def json(request, node_id):
+    """
+    Returns a json description of a node
+    """
+
+    # retrieve object or return 404 error
+    try:
+        node = Node.objects.exclude(status='u').get(pk=node_id)
+    except ObjectDoesNotExist:
+        raise Http404
+
+    node_with_devices = {
+        'node': node,
+        'devices': []
+    }
+    devices = Device.objects.filter(node=node_id)
+    for device in devices:
+        interfaces = Interface.objects.filter(device=device.id)
+        hnas = Hna.objects.filter(device=device.id)
+        node_with_devices['devices'].append({
+            'device': device,
+            'interfaces': list(interfaces),
+            'hna': list(hnas)
+        })
+
+    # return json
+    return json_response_from(node_with_devices)
 
 def jstree(request):
     """

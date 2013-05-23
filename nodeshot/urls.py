@@ -8,6 +8,7 @@ urlpatterns = patterns('',
     url(r'^nodes.json', 'nodeshot.views.nodes', name='nodeshot_nodes'),
     url(r'^jstree.json', 'nodeshot.views.jstree', name='nodeshot_jstree'),
     url(r'^search/(?P<what>.*)/$', 'nodeshot.views.search', name='nodeshot_search'),
+    url(r'^node/json/(?P<node_id>\d+)/$', 'nodeshot.views.json', name='nodeshot_node_json'),
     url(r'^node/info/(?P<node_id>\d+)/$', 'nodeshot.views.node_info', name='nodeshot_node_info'),
     url(r'^overview/', 'nodeshot.views.overview', name='nodeshot_overview'), # INFO button on sidebar
     url(r'^node/advanced/(?P<node_id>\d+)/$', 'nodeshot.views.advanced', name='nodeshot_node_advanced'),
