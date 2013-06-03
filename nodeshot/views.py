@@ -73,103 +73,6 @@ def index(request, slug=False):
 
     return render_to_response('index.html', context, context_instance=RequestContext(request))
 
-def nodes(request):
-    """
-    Returns a json list with all the nodes divided in active, potential and hostspot
-    Populates javascript object nodeshot.nodes
-    """
-    # retrieve nodes in 3 different objects depending on the status
-    active = Node.objects.filter(status = 'a').values('name', 'slug', 'id', 'lng', 'lat', 'status')
-    # status ah (active & hotspot) will fall in the hotspot group, having the hotspot icon
-    hotspot = Node.objects.filter(Q(status = 'h') | Q(status = 'ah')).values('name', 'slug', 'id', 'lng', 'lat', 'status')
-    potential = Node.objects.filter(status = 'p').values('name', 'slug', 'id', 'lng', 'lat', 'status')
-
-    # retrieve links, select_related() reduces the number of queries,
-    # only() selects only the fields we need
-    # double underscore __ indicates that we are following a foreign key
-    link_queryset = Link.objects.all().exclude(hide=True).select_related().only(
-        'from_interface__device__node__lat', 'from_interface__device__node__lng',
-        'to_interface__device__node__lat', 'to_interface__device__node__lng',
-        'to_interface__device__node__name', 'to_interface__device__node__name',
-        'etx', 'dbm'
-    )
-    # evaluate queryset
-    
-    # prepare empty list
-    links = []
-    # loop over queryset (remember: evaluating queryset makes query to the db)
-    for l in link_queryset:
-        # determining link colour (depending on link quality)
-        etx = l.get_quality('etx')
-        dbm = l.get_quality('dbm')
-        # prepare result
-        entry = {
-            'from_lng': l.from_interface.device.node.lng ,
-            'from_lat': l.from_interface.device.node.lat,
-            'to_lng': l.to_interface.device.node.lng,
-            'to_lat': l.to_interface.device.node.lat,
-            # raw values
-            'retx': l.etx,
-            'rdbm': l.dbm,
-            # interpreted values (link quality, can be 1, 2 or 3)
-            'etx': etx,
-            'dbm': dbm
-        }
-        # append/push result into list
-        links.append(entry)
-    
-    #prepare data for json serialization
-    active_nodes, hotspot_nodes, potential_nodes = {}, {}, {}
-    for node in active:
-        node['jslug'] = jslugify(node['slug'])
-        active_nodes[jslugify(node['slug'])] = node
-    for node in hotspot:
-        node['jslug'] = jslugify(node['slug'])
-        hotspot_nodes[jslugify(node['slug'])] = node
-    for node in potential:
-        node['jslug'] = jslugify(node['slug'])
-        potential_nodes[jslugify(node['slug'])] = node
-    data = {
-        'active': active_nodes,
-        'hotspot': hotspot_nodes,        
-        'potential': potential_nodes,
-        'links': links
-    }
-    # return json
-    return HttpResponse(simplejson.dumps(data), mimetype='application/json')
-
-def json_response_from(response):
-    jsonSerializer = JSONSerializer()
-    return HttpResponse(jsonSerializer.serialize(response, use_natural_keys=True), mimetype='application/json')
-
-def json(request, node_id):
-    """
-    Returns a json description of a node
-    """
-
-    # retrieve object or return 404 error
-    try:
-        node = Node.objects.exclude(status='u').get(pk=node_id)
-    except ObjectDoesNotExist:
-        raise Http404
-
-    node_with_devices = {
-        'node': node,
-        'devices': []
-    }
-    devices = Device.objects.filter(node=node_id)
-    for device in devices:
-        interfaces = Interface.objects.filter(device=device.id)
-        hnas = Hna.objects.filter(device=device.id)
-        node_with_devices['devices'].append({
-            'device': device,
-            'interfaces': list(interfaces),
-            'hna': list(hnas)
-        })
-
-    # return json
-    return json_response_from(node_with_devices)
-
 def jstree(request):
     """
     Populates jquery.jstree plugin
@@ -188,7 +91,7 @@ def jstree(request):
         elif a['status'] == 'ah':
             # treat "active & hotspot" like hotspots
             status = 'hotspot'
-        
+
         active_list.append({
             'data': {
                 'title': a['name'],
@@ -249,7 +152,7 @@ def jstree(request):
         })
     # return json
     return HttpResponse(simplejson.dumps(data), mimetype='application/json')
-    
+
 def search(request, what):
     data = []
     data = data + [{'label': n.name, 'value': jslugify(n.slug), 'slug': n.slug, 'name': n.name, 'lat': n.lat, 'lng': n.lng, 'status': n.status }  for n in Node.objects.filter(name__icontains=what).exclude(status='u').only('name','slug','lat','lng','status')]
